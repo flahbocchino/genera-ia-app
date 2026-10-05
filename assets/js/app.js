@@ -4,6 +4,7 @@
 // - Carga do relatório registrada no log (logger.js), com tempo e quantidade de marcadores.
 // - Validação da estrutura do JSON antes de montar o painel.
 // - Mensagem clara ao usuário em caso de falha na carga dos dados.
+// - Correção da data do relatório exibida um dia antes por causa do fuso horário.
 
 let DADOS = null;
 let categoriaAtiva = 'todas';
@@ -89,8 +90,10 @@ async function init() {
   }
 
   document.getElementById('paciente-id').textContent = DADOS.paciente.id_anonimizado;
+  // A data do JSON (AAAA-MM-DD) é lida como UTC; exibir em UTC evita que o fuso
+  // horário de Brasília mostre o dia anterior (correção da Sprint 4).
   document.getElementById('paciente-data').textContent =
-    'Relatório de ' + new Date(DADOS.paciente.data_relatorio).toLocaleDateString('pt-BR');
+    'Relatório de ' + new Date(DADOS.paciente.data_relatorio).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
   renderAncestralidade();
   renderFiltros();
