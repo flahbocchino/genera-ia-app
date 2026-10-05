@@ -14,6 +14,7 @@
 // - O texto gerado pelo modelo é escapado antes de ser exibido.
 // - Busca do marcador relacionado à pergunta corrigida após a avaliação.
 // - Perguntas fora do escopo do relatório não são enviadas ao modelo (guard rail).
+// - Novos critérios de rejeição após a revisão humana da avaliação completa.
 
 const TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 const MODELO_TEXTO = 'Xenova/LaMini-Flan-T5-77M';
@@ -135,20 +136,40 @@ async function chamarModeloTexto(instrucao, aoAtualizarStatus, funcionalidade) {
 // ---------- Camada de confiabilidade ----------
 
 // Retorna null se a resposta for aceitável, ou o motivo da rejeição.
-// Critérios idênticos aos da Sprint 3; agora o motivo é registrado no log.
+// Critérios da Sprint 3 (vazia, inglês, eco da instrução) + critérios da Sprint 4,
+// criados após a revisão humana da avaliação completa (docs/avaliacao-modelo.md):
+// alfabeto não latino, eco do contexto, resposta em forma de pergunta e formato de rótulo.
+const FRAGMENTOS_ECO_INSTRUCAO = [
+  'nunca faça diagn', 'linguagem alarmista', 'não substitui', 'de forma simples e breve',
+  'responda em português', 'lembre que', 'nunca use', 'forma simples', 'português do brasil'
+];
+
+const FRAGMENTOS_ECO_CONTEXTO = [
+  'pergunta do', 'contexto do relat', 'patient', 'symptom', 'riddle',
+  'risco medio', 'risco baixo', 'risco alto', 'risco informativo', 'risco minimo'
+];
+
 function motivoRejeicao(texto) {
   if (!texto || texto.length < 12) return 'resposta_vazia_ou_curta';
+
+  // Letras fora do alfabeto latino (ex.: cirílico, grego, árabe, asiático)
+  if (/[^\u0000-\u024F\u1E00-\u1EFF\u2000-\u206F\u20A0-\u20CF]/.test(texto)) return 'alfabeto_invalido';
 
   const indicadoresIngles = /\b(the|is|does|not|mention|provided|text|any|this|that|with|and)\b/i;
   const palavrasIngles = (texto.match(indicadoresIngles) || []).length;
   if (palavrasIngles >= 2) return 'idioma_ingles';
 
   const textoLower = texto.toLowerCase();
-  const fragmentosEco = [
-    'nunca faça diagn', 'linguagem alarmista', 'não substitui', 'de forma simples e breve',
-    'responda em português', 'lembre que', 'nunca use', 'forma simples', 'português do brasil'
-  ];
-  if (fragmentosEco.some(frag => textoLower.includes(frag))) return 'eco_da_instrucao';
+  if (FRAGMENTOS_ECO_INSTRUCAO.some(frag => textoLower.includes(frag))) return 'eco_da_instrucao';
+
+  const textoNormalizado = normalizarTexto(texto);
+  if (FRAGMENTOS_ECO_CONTEXTO.some(frag => textoNormalizado.includes(frag))) return 'eco_do_contexto';
+
+  // Uma resposta que termina em pergunta não responde ao paciente (eco da pergunta)
+  if (texto.trim().endsWith('?')) return 'nao_e_resposta';
+
+  // Rótulo seguido de dois-pontos (ex.: "Marcador X: ...") em vez de uma explicação
+  if (/^\s*[-•*]?\s*[^.!?:]{2,60}:\s/.test(texto)) return 'formato_de_rotulo';
 
   return null;
 }
