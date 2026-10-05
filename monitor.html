@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genera IA — Monitoramento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/sprint4.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="eyebrow">Genera IA · Enterprise Challenge Sprint 4 · FIAP × Dasa</div>
+  <h1>Monitoramento do sistema</h1>
+  <div class="paciente-info">Atualizado em <span id="atualizado-em">—</span> · atualização automática a cada 5 segundos</div>
+  <nav class="nav-sprint4">
+    <a class="nav-link" href="index.html">Painel do paciente</a>
+    <a class="nav-link ativo" href="monitor.html">Monitoramento</a>
+    <a class="nav-link" href="avaliacao.html">Avaliação do modelo</a>
+  </nav>
+  <div class="disclaimer">
+    <strong>Sobre estes registros:</strong> os eventos ficam armazenados apenas neste navegador e não contêm o texto das perguntas, imagens ou dados pessoais, conforme a Política de Governança de IA do projeto (<code>docs/politica-governanca-ia.md</code>). Limite de retenção: 500 eventos.
+  </div>
+</header>
+
+<div class="container">
+
+  <section>
+    <h2>Indicadores</h2>
+    <p class="section-sub">Visão geral da operação registrada neste navegador.</p>
+    <div class="kpi-grid" id="kpis"></div>
+  </section>
+
+  <section>
+    <h2>Status do pipeline</h2>
+    <p class="section-sub">Situação do último evento registrado em cada etapa. Verde: ok · Amarelo: resposta rejeitada e substituída · Vermelho: falha · Cinza: sem registros.</p>
+    <div class="etapas-grid" id="etapas"></div>
+  </section>
+
+  <section>
+    <h2>Alertas</h2>
+    <p class="section-sub">Regras automáticas que identificam falhas ou comportamentos inesperados.</p>
+    <div class="tabela-wrapper" id="alertas"></div>
+  </section>
+
+  <section>
+    <h2>Motivos de rejeição das respostas do modelo</h2>
+    <p class="section-sub">Quando a saída do modelo é rejeitada, o sistema registra o critério que a reprovou e usa o texto de apoio baseado no relatório.</p>
+    <div class="tabela-wrapper" id="motivos"></div>
+  </section>
+
+  <section>
+    <h2>Respostas por funcionalidade</h2>
+    <p class="section-sub">Origem das respostas entregues ao usuário em cada parte da aplicação.</p>
+    <div class="tabela-wrapper" id="funcionalidades"></div>
+  </section>
+
+  <section>
+    <h2>Últimos eventos</h2>
+    <p class="section-sub">Os 50 registros mais recentes, do mais novo para o mais antigo.</p>
+    <div class="acoes-row" style="margin-bottom:12px;">
+      <button class="btn" id="btn-atualizar">Atualizar agora</button>
+      <button class="btn btn-secundario" id="btn-exportar">Exportar logs (CSV)</button>
+      <button class="btn btn-secundario" id="btn-apagar-logs">Apagar logs</button>
+      <button class="btn btn-secundario" id="btn-apagar-historico">Apagar histórico do chat</button>
+    </div>
+    <div class="tabela-wrapper" id="eventos"></div>
+  </section>
+
+  <footer>
+    Genera IA — Enterprise Challenge Sprint 4 · FIAP × Dasa · Flavia Bocchino (RM564213)
+  </footer>
+
+</div>
+
+<script src="assets/js/logger.js"></script>
+<script>
+// ---------- Configuração ----------
+
+const NOMES_ETAPA = {
+  carga_dados: 'Carga dos dados',
+  carga_modelo: 'Carga do modelo',
+  inferencia: 'Resposta do modelo',
+  fallback: 'Texto de apoio',
+  visao: 'Leitura de imagem',
+  erro: 'Erro'
+};
+
+const NOMES_FUNCIONALIDADE = {
+  explicacao: 'Explicação de marcador',
+  chat: 'Chat',
+  resumo: 'Resumo automático',
+  visao_interpretacao: 'Interpretação de imagem'
+};
+
+const NOMES_MOTIVO = {
+  resposta_vazia_ou_curta: 'Resposta vazia ou curta demais',
+  idioma_ingles: 'Resposta em inglês',
+  eco_da_instrucao: 'Modelo repetiu as instruções',
+  modelo_indisponivel: 'Modelo indisponível (falha de carga ou memória)',
+  modo_somente_relatorio: 'Avaliação no modo somente relatório',
+  legenda_inutil: 'Descrição da imagem vazia ou insuficiente',
+  tipo_invalido: 'Arquivo de imagem em formato não aceito',
+  arquivo_grande: 'Arquivo de imagem acima do limite'
+};
+
+// Cada etapa do pipeline exibida no painel e o filtro que identifica seus eventos
+const ETAPAS_PIPELINE = [
+  { titulo: 'Carga dos dados (JSON)', filtro: e => e.etapa === 'carga_dados' },
+  { titulo: 'Carga do modelo de texto', filtro: e => e.etapa === 'carga_modelo' && e.funcionalidade !== 'visao' },
+  { titulo: 'Carga do modelo de visão', filtro: e => e.etapa === 'carga_modelo' && e.funcionalidade === 'visao' },
+  { titulo: 'Respostas do agente', filtro: e => e.etapa === 'inferencia' || e.etapa === 'fallback' },
+  { titulo: 'Leitura de imagem', filtro: e => e.etapa === 'visao' },
+  { titulo: 'Erros não tratados', filtro: e => e.etapa === 'erro' }
+];
+
+// ---------- Utilitários ----------
+
+function esc(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function dataHora(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('pt-BR');
+}
+
+function pct(parte, total) {
+  if (!total) return '—';
+  return Math.round((parte / total) * 100) + '%';
+}
+
+function media(valores) {
+  const validos = valores.filter(v => typeof v === 'number');
+  if (validos.length === 0) return null;
+  return Math.round(validos.reduce((a, b) => a + b, 0) / validos.length);
+}
+
+// ---------- Renderização ----------
+
+function renderKPIs(logs) {
+  const respostas = logs.filter(e => e.etapa === 'inferencia' || e.etapa === 'fallback');
+  const doModelo = respostas.filter(e => e.origem_resposta === 'modelo').length;
+  const deApoio = respostas.filter(e => e.origem_resposta === 'fallback').length;
+  const falhas = logs.filter(e => e.status === 'falha').length;
+  const latMedia = media(respostas.map(e => e.latencia_ms));
+
+  const kpis = [
+    { valor: logs.length, label: 'Eventos registrados' },
+    { valor: respostas.length, label: 'Respostas entregues' },
+    { valor: pct(doModelo, respostas.length), label: 'Respostas do modelo de IA' },
+    { valor: pct(deApoio, respostas.length), label: 'Taxa de texto de apoio (fallback)' },
+    { valor: falhas, label: 'Falhas registradas' },
+    { valor: latMedia === null ? '—' : latMedia + ' ms', label: 'Tempo médio de resposta' }
+  ];
+
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi"><div class="kpi-valor">${esc(k.valor)}</div><div class="kpi-label">${esc(k.label)}</div></div>`
+  ).join('');
+}
+
+function renderEtapas(logs) {
+  document.getElementById('etapas').innerHTML = ETAPAS_PIPELINE.map(etapa => {
+    const eventos = logs.filter(etapa.filtro);
+    const ultimo = eventos[eventos.length - 1];
+    const ok = eventos.filter(e => e.status === 'ok').length;
+    const rejeitados = eventos.filter(e => e.status === 'rejeitado').length;
+    const falhas = eventos.filter(e => e.status === 'falha').length;
+    const classe = ultimo ? ultimo.status : 'sem-dados';
+
+    const detalhe = ultimo
+      ? `Último: ${dataHora(ultimo.timestamp)}<br>ok: ${ok} · rejeitados: ${rejeitados} · falhas: ${falhas}` +
+        (ultimo.mensagem_erro ? `<br>Erro: ${esc(ultimo.mensagem_erro)}` : '')
+      : 'Nenhum evento registrado ainda.';
+
+    return `<div class="etapa-card"><h3><span class="status-dot ${classe}"></span>${esc(etapa.titulo)}</h3><p>${detalhe}</p></div>`;
+  }).join('');
+}
+
+function renderAlertas(logs) {
+  const alertas = [];
+  const respostas = logs.filter(e => e.etapa === 'inferencia' || e.etapa === 'fallback');
+  const ultimaCargaDados = logs.filter(e => e.etapa === 'carga_dados').pop();
+  const ultimaCargaModelo = logs.filter(e => e.etapa === 'carga_modelo' && e.funcionalidade !== 'visao').pop();
+  const ultimaCargaVisao = logs.filter(e => e.etapa === 'carga_modelo' && e.funcionalidade === 'visao').pop();
+  const errosNaoTratados = logs.filter(e => e.etapa === 'erro');
+  const respostasLentas = respostas.filter(e => typeof e.latencia_ms === 'number' && e.latencia_ms > 30000);
+  const deApoio = respostas.filter(e => e.origem_resposta === 'fallback').length;
+
+  if (ultimaCargaDados && ultimaCargaDados.status === 'falha') {
+    alertas.push({ nivel: 'falha', texto: 'A última carga do relatório falhou. O painel do paciente não pode ser exibido.' });
+  }
+  if (ultimaCargaModelo && ultimaCargaModelo.status === 'falha') {
+    alertas.push({ nivel: 'falha', texto: 'O modelo de texto não carregou. O sistema está respondendo apenas com o texto de apoio baseado no relatório.' });
+  }
+  if (ultimaCargaVisao && ultimaCargaVisao.status === 'falha') {
+    alertas.push({ nivel: 'falha', texto: 'O modelo de visão não carregou. A leitura de imagens está indisponível.' });
+  }
+  if (errosNaoTratados.length > 0) {
+    alertas.push({ nivel: 'falha', texto: `${errosNaoTratados.length} erro(s) não tratado(s) registrado(s). Verifique a tabela de eventos.` });
+  }
+  if (respostas.length >= 5 && deApoio / respostas.length > 0.8) {
+    alertas.push({ nivel: 'rejeitado', texto: `Taxa de texto de apoio acima de 80% (${pct(deApoio, respostas.length)}). O modelo de IA está sendo rejeitado com frequência; as respostas continuam fundamentadas no relatório.` });
+  }
+  if (respostasLentas.length > 0) {
+    alertas.push({ nivel: 'rejeitado', texto: `${respostasLentas.length} resposta(s) acima de 30 segundos. Pode indicar pouca memória disponível no dispositivo.` });
+  }
+
+  const el = document.getElementById('alertas');
+  if (alertas.length === 0) {
+    el.innerHTML = '<p class="texto-vazio">Nenhum alerta ativo.</p>';
+    return;
+  }
+  el.innerHTML = `<table class="tabela"><thead><tr><th>Nível</th><th>Descrição</th></tr></thead><tbody>` +
+    alertas.map(a => `<tr><td><span class="tag-status ${a.nivel}">${a.nivel === 'falha' ? 'crítico' : 'atenção'}</span></td><td>${esc(a.texto)}</td></tr>`).join('') +
+    `</tbody></table>`;
+}
+
+function renderMotivos(logs) {
+  const rejeicoes = logs.filter(e => e.motivo_rejeicao);
+  const el = document.getElementById('motivos');
+  if (rejeicoes.length === 0) {
+    el.innerHTML = '<p class="texto-vazio">Nenhuma rejeição registrada.</p>';
+    return;
+  }
+  const contagem = {};
+  rejeicoes.forEach(e => { contagem[e.motivo_rejeicao] = (contagem[e.motivo_rejeicao] || 0) + 1; });
+  const linhas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+
+  el.innerHTML = `<table class="tabela"><thead><tr><th>Motivo</th><th>Código</th><th>Ocorrências</th><th>%</th></tr></thead><tbody>` +
+    linhas.map(([motivo, qtd]) =>
+      `<tr><td>${esc(NOMES_MOTIVO[motivo] || motivo)}</td><td class="mono">${esc(motivo)}</td><td>${qtd}</td><td>${pct(qtd, rejeicoes.length)}</td></tr>`
+    ).join('') + `</tbody></table>`;
+}
+
+function renderFuncionalidades(logs) {
+  const respostas = logs.filter(e => (e.etapa === 'inferencia' || e.etapa === 'fallback') && e.funcionalidade);
+  const el = document.getElementById('funcionalidades');
+  if (respostas.length === 0) {
+    el.innerHTML = '<p class="texto-vazio">Nenhuma resposta registrada ainda. Use o painel do paciente para gerar respostas.</p>';
+    return;
+  }
+  const grupos = {};
+  respostas.forEach(e => {
+    const g = grupos[e.funcionalidade] || (grupos[e.funcionalidade] = { total: 0, modelo: 0, apoio: 0, latencias: [] });
+    g.total++;
+    if (e.origem_resposta === 'modelo') g.modelo++; else g.apoio++;
+    g.latencias.push(e.latencia_ms);
+  });
+
+  el.innerHTML = `<table class="tabela"><thead><tr><th>Funcionalidade</th><th>Total</th><th>Modelo de IA</th><th>Texto de apoio</th><th>Tempo médio</th></tr></thead><tbody>` +
+    Object.entries(grupos).map(([func, g]) => {
+      const lat = media(g.latencias);
+      return `<tr><td>${esc(NOMES_FUNCIONALIDADE[func] || func)}</td><td>${g.total}</td><td>${g.modelo} (${pct(g.modelo, g.total)})</td><td>${g.apoio} (${pct(g.apoio, g.total)})</td><td class="mono">${lat === null ? '—' : lat + ' ms'}</td></tr>`;
+    }).join('') + `</tbody></table>`;
+}
+
+function renderEventos(logs) {
+  const el = document.getElementById('eventos');
+  if (logs.length === 0) {
+    el.innerHTML = '<p class="texto-vazio">Nenhum evento registrado neste navegador. Abra o painel do paciente e use as funcionalidades para gerar registros.</p>';
+    return;
+  }
+  const recentes = logs.slice(-50).reverse();
+  el.innerHTML = `<table class="tabela"><thead><tr>
+      <th>Data/hora</th><th>Etapa</th><th>Funcionalidade</th><th>Status</th><th>Origem</th><th>Motivo</th><th>Marcador</th><th>Tempo</th><th>Erro</th>
+    </tr></thead><tbody>` +
+    recentes.map(e => `<tr>
+      <td class="mono">${esc(dataHora(e.timestamp))}</td>
+      <td>${esc(NOMES_ETAPA[e.etapa] || e.etapa)}</td>
+      <td>${esc(NOMES_FUNCIONALIDADE[e.funcionalidade] || e.funcionalidade || '—')}</td>
+      <td><span class="tag-status ${esc(e.status)}">${esc(e.status)}</span></td>
+      <td>${esc(e.origem_resposta || '—')}</td>
+      <td class="mono">${esc(e.motivo_rejeicao || '—')}</td>
+      <td class="mono">${esc(e.marcador_id || '—')}</td>
+      <td class="mono">${e.latencia_ms === null || e.latencia_ms === undefined ? '—' : esc(e.latencia_ms) + ' ms'}</td>
+      <td>${esc(e.mensagem_erro || '—')}</td>
+    </tr>`).join('') + `</tbody></table>`;
+}
+
+function atualizarPainel() {
+  const logs = lerLogs();
+  renderKPIs(logs);
+  renderEtapas(logs);
+  renderAlertas(logs);
+  renderMotivos(logs);
+  renderFuncionalidades(logs);
+  renderEventos(logs);
+  document.getElementById('atualizado-em').textContent = new Date().toLocaleTimeString('pt-BR');
+}
+
+// ---------- Ações ----------
+
+document.getElementById('btn-atualizar').addEventListener('click', atualizarPainel);
+
+document.getElementById('btn-exportar').addEventListener('click', () => {
+  const data = new Date().toISOString().slice(0, 10);
+  exportarLogsCSV(`genera_logs_${data}.csv`);
+});
+
+document.getElementById('btn-apagar-logs').addEventListener('click', () => {
+  if (confirm('Apagar todos os logs registrados neste navegador? Esta ação não pode ser desfeita.')) {
+    limparLogs();
+    atualizarPainel();
+  }
+});
+
+document.getElementById('btn-apagar-historico').addEventListener('click', () => {
+  if (confirm('Apagar o histórico do chat e o último resumo salvos neste navegador?')) {
+    localStorage.removeItem('genera_chat_historico');
+    localStorage.removeItem('genera_ultimo_resumo');
+    alert('Histórico do chat apagado.');
+  }
+});
+
+// Atualiza quando outra aba (o painel do paciente) grava novos eventos
+window.addEventListener('storage', (e) => {
+  if (e.key === LOG_CHAVE || e.key === null) atualizarPainel();
+});
+
+atualizarPainel();
+setInterval(atualizarPainel, 5000);
+</script>
+</body>
+</html>

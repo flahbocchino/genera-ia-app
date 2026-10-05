@@ -1,0 +1,221 @@
+/* sprint4.css — Estilos dos elementos adicionados na Sprint 4
+   (explicabilidade, navegação, monitoramento e avaliação).
+   Complementa style.css sem alterá-lo. */
+
+/* ---------- Navegação entre páginas ---------- */
+.nav-sprint4 {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.nav-link {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  transition: all 0.15s ease;
+}
+
+.nav-link:hover,
+.nav-link.ativo {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ---------- Explicabilidade: origem e fonte da resposta ---------- */
+.meta-resposta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.selo-origem {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.selo-origem.modelo {
+  background: rgba(255, 62, 127, 0.15);
+  color: var(--accent);
+}
+
+.selo-origem.relatorio {
+  background: rgba(108, 140, 255, 0.15);
+  color: var(--risco-info);
+}
+
+.fonte-resposta {
+  color: var(--text-dim);
+}
+
+.aviso-msg {
+  display: block;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.aviso-erro {
+  color: var(--risco-medio);
+  font-size: 13px;
+}
+
+/* ---------- Indicadores (monitoramento e avaliação) ---------- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.kpi-valor {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ---------- Etapas do pipeline ---------- */
+.etapas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.etapa-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.etapa-card h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.etapa-card p {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot.ok { background: var(--risco-baixo); }
+.status-dot.rejeitado { background: var(--risco-medio); }
+.status-dot.falha { background: var(--risco-alto); }
+.status-dot.sem-dados { background: var(--border); }
+
+/* ---------- Tabelas ---------- */
+.tabela-wrapper {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tabela th,
+.tabela td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.tabela th {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.tabela td.mono {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.tag-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.tag-status.ok,
+.tag-status.aprovado { background: rgba(74, 222, 158, 0.15); color: var(--risco-baixo); }
+
+.tag-status.rejeitado { background: rgba(245, 185, 66, 0.15); color: var(--risco-medio); }
+
+.tag-status.falha,
+.tag-status.reprovado { background: rgba(255, 107, 107, 0.15); color: var(--risco-alto); }
+
+/* ---------- Barra de ações ---------- */
+.acoes-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.opcao-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 12px 0;
+}
+
+.texto-vazio {
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 16px;
+}

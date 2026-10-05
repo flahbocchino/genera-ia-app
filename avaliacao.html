@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genera IA — Avaliação do Modelo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/sprint4.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="eyebrow">Genera IA · Enterprise Challenge Sprint 4 · FIAP × Dasa</div>
+  <h1>Avaliação do modelo e validação das respostas</h1>
+  <div class="paciente-info">Casos de teste: <code>testes/casos_teste.json</code></div>
+  <nav class="nav-sprint4">
+    <a class="nav-link" href="index.html">Painel do paciente</a>
+    <a class="nav-link" href="monitor.html">Monitoramento</a>
+    <a class="nav-link ativo" href="avaliacao.html">Avaliação do modelo</a>
+  </nav>
+  <div class="disclaimer">
+    <strong>Como funciona:</strong> esta página executa automaticamente as perguntas de teste no mesmo agente usado pelo painel do paciente e verifica cada resposta. A <strong>avaliação rápida</strong> testa apenas a camada baseada no relatório (segundos). A <strong>avaliação completa</strong> carrega o modelo de IA no navegador e testa as duas camadas (pode levar alguns minutos).
+  </div>
+</header>
+
+<div class="container">
+
+  <section>
+    <h2>Executar</h2>
+    <p class="section-sub">Escolha o tipo de avaliação. Mantenha esta aba aberta até o fim.</p>
+    <div class="acoes-row">
+      <button class="btn" id="btn-rapida">Avaliação rápida (somente relatório)</button>
+      <button class="btn" id="btn-completa">Avaliação completa (com modelo de IA)</button>
+      <button class="btn btn-secundario" id="btn-exportar" disabled>Exportar resultados (CSV)</button>
+    </div>
+    <p class="opcao-row" id="progresso">Aguardando execução.</p>
+  </section>
+
+  <section>
+    <h2>Resultado geral</h2>
+    <p class="section-sub" id="resumo-execucao">Nenhuma avaliação executada ainda.</p>
+    <div class="kpi-grid" id="kpis"></div>
+  </section>
+
+  <section>
+    <h2>Perguntas do chat (19 casos)</h2>
+    <p class="section-sub">Cada pergunta é executada duas vezes para medir a consistência.</p>
+    <div class="tabela-wrapper" id="tabela-chat"><p class="texto-vazio">—</p></div>
+  </section>
+
+  <section>
+    <h2>Explicações dos marcadores (15 casos) e resumo</h2>
+    <p class="section-sub">Explicação simplificada de cada achado do relatório e o resumo automático.</p>
+    <div class="tabela-wrapper" id="tabela-explicacoes"><p class="texto-vazio">—</p></div>
+  </section>
+
+  <section>
+    <h2>Generalização (10 perguntas novas)</h2>
+    <p class="section-sub">Perguntas que não foram usadas para ajustar o sistema. Mede se a identificação do marcador funciona com formulações diferentes.</p>
+    <div class="tabela-wrapper" id="tabela-generalizacao"><p class="texto-vazio">—</p></div>
+  </section>
+
+  <footer>
+    Genera IA — Enterprise Challenge Sprint 4 · FIAP × Dasa · Flavia Bocchino (RM564213)
+  </footer>
+
+</div>
+
+<script src="assets/js/logger.js"></script>
+<script src="assets/js/agente.js"></script>
+<script>
+// DADOS é usado pelas funções do agente.js (na página principal, é definido pelo app.js)
+let DADOS = null;
+let CASOS = null;
+let resultados = [];
+let executando = false;
+
+// ---------- Utilitários ----------
+
+function esc(valor) {
+  if (valor === null || valor === undefined) return '';
+  return String(valor)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function semHTML(texto) {
+  return String(texto || '').replace(/<[^>]+>/g, '');
+}
+
+function pct(parte, total) {
+  if (!total) return '—';
+  return Math.round((parte / total) * 100) + '%';
+}
+
+function marca(valor) {
+  if (valor === null || valor === undefined) return '<span class="fonte-resposta">n/a</span>';
+  return valor
+    ? '<span class="tag-status aprovado">sim</span>'
+    : '<span class="tag-status reprovado">não</span>';
+}
+
+function progresso(msg) {
+  document.getElementById('progresso').textContent = msg;
+}
+
+// ---------- Critérios de validação ----------
+
+function emPortugues(texto) {
+  return motivoRejeicao(semHTML(texto)) !== 'idioma_ingles';
+}
+
+function semTermosProibidos(texto) {
+  const t = normalizarTexto(semHTML(texto));
+  return !CASOS.termos_proibidos.some(termo => t.includes(normalizarTexto(termo)));
+}
+
+// A resposta fala do marcador esperado (pelo menos uma palavra do nome dele)
+function falaDoMarcador(texto, idMarcador) {
+  const marcador = DADOS.marcadores.find(m => m.id === idMarcador);
+  if (!marcador) return false;
+  const palavrasResposta = extrairPalavras(semHTML(texto));
+  return extrairPalavras(marcador.nome).some(p => palavrasResposta.some(r => palavrasCombinam(r, p)));
+}
+
+// Pergunta fora do escopo deve receber a orientação padrão, sem conteúdo inventado
+function orientouForaDoEscopo(texto) {
+  return normalizarTexto(semHTML(texto)).includes('nao encontrei esse tema');
+}
+
+// ---------- Carga ----------
+
+async function carregarArquivos() {
+  if (DADOS && CASOS) return;
+  const [resDados, resCasos] = await Promise.all([
+    fetch('data/relatorio_genera_expandido.json'),
+    fetch('testes/casos_teste.json')
+  ]);
+  if (!resDados.ok) throw new Error('Não foi possível carregar o relatório.');
+  if (!resCasos.ok) throw new Error('Não foi possível carregar os casos de teste.');
+  DADOS = await resDados.json();
+  CASOS = await resCasos.json();
+}
+
+// ---------- Execução ----------
+
+async function executarAvaliacao(usarModelo) {
+  if (executando) return;
+  executando = true;
+  document.getElementById('btn-rapida').disabled = true;
+  document.getElementById('btn-completa').disabled = true;
+  document.getElementById('btn-exportar').disabled = true;
+  resultados = [];
+  const inicioGeral = performance.now();
+
+  try {
+    progresso('Carregando relatório e casos de teste...');
+    await carregarArquivos();
+    MODO_SOMENTE_RELATORIO = !usarModelo;
+
+    const status = (msg) => progresso(msg);
+
+    // 1) Perguntas do chat (duas execuções por pergunta)
+    for (let i = 0; i < CASOS.casos.length; i++) {
+      const c = CASOS.casos[i];
+      progresso(`Chat: caso ${i + 1} de ${CASOS.casos.length} (${c.id})...`);
+      const r1 = await perguntarAoAgente(c.pergunta, status);
+      const r2 = await perguntarAoAgente(c.pergunta, status);
+      const obtido = r1.marcador ? r1.marcador.id : null;
+
+      const criterios = {
+        marcador_correto: obtido === c.marcador_esperado,
+        portugues: emPortugues(r1.texto),
+        sem_termos_proibidos: semTermosProibidos(r1.texto),
+        aderencia: c.marcador_esperado ? falaDoMarcador(r1.texto, c.marcador_esperado) : orientouForaDoEscopo(r1.texto),
+        consistente: r1.texto === r2.texto
+      };
+
+      resultados.push({
+        grupo: 'chat', id: c.id, tipo: c.tipo, entrada: c.pergunta,
+        esperado: c.marcador_esperado, obtido, origem: r1.origem, motivo: r1.motivo,
+        saida_modelo: r1.resposta_modelo, resposta: semHTML(r1.texto), latencia_ms: r1.latencia_ms,
+        ...criterios,
+        aprovado: Object.values(criterios).every(Boolean)
+      });
+      renderTabelas();
+    }
+
+    // 2) Explicações de cada marcador
+    for (let i = 0; i < DADOS.marcadores.length; i++) {
+      const m = DADOS.marcadores[i];
+      progresso(`Explicações: ${i + 1} de ${DADOS.marcadores.length} (${m.id})...`);
+      const r = await explicarMarcador(m, status);
+      const criterios = {
+        marcador_correto: null,
+        portugues: emPortugues(r.texto),
+        sem_termos_proibidos: semTermosProibidos(r.texto),
+        aderencia: falaDoMarcador(r.texto, m.id),
+        consistente: null
+      };
+      resultados.push({
+        grupo: 'explicacao', id: m.id, tipo: 'explicacao', entrada: m.nome,
+        esperado: m.id, obtido: m.id, origem: r.origem, motivo: r.motivo,
+        saida_modelo: r.resposta_modelo, resposta: semHTML(r.texto), latencia_ms: r.latencia_ms,
+        ...criterios,
+        aprovado: criterios.portugues && criterios.sem_termos_proibidos && criterios.aderencia
+      });
+      renderTabelas();
+    }
+
+    // 3) Resumo automático
+    progresso('Resumo automático...');
+    const rr = await resumirRelatorio(status);
+    const critResumo = {
+      marcador_correto: null,
+      portugues: emPortugues(rr.texto),
+      sem_termos_proibidos: semTermosProibidos(rr.texto),
+      aderencia: null,
+      consistente: null
+    };
+    resultados.push({
+      grupo: 'explicacao', id: 'R01', tipo: 'resumo', entrada: 'Resumo de todos os achados',
+      esperado: null, obtido: null, origem: rr.origem, motivo: rr.motivo,
+      saida_modelo: rr.resposta_modelo, resposta: semHTML(rr.texto), latencia_ms: rr.latencia_ms,
+      ...critResumo,
+      aprovado: critResumo.portugues && critResumo.sem_termos_proibidos
+    });
+
+    // 4) Generalização (identificação do marcador, sem modelo)
+    progresso('Generalização...');
+    CASOS.casos_generalizacao.forEach(c => {
+      const m = encontrarMarcadorRelevante(c.pergunta);
+      const obtido = m ? m.id : null;
+      resultados.push({
+        grupo: 'generalizacao', id: c.id, tipo: 'generalizacao', entrada: c.pergunta,
+        esperado: c.marcador_esperado, obtido, origem: null, motivo: null,
+        saida_modelo: null, resposta: '', latencia_ms: null,
+        marcador_correto: obtido === c.marcador_esperado,
+        portugues: null, sem_termos_proibidos: null, aderencia: null, consistente: null,
+        aprovado: obtido === c.marcador_esperado,
+        observacao: c.limitacao_conhecida || ''
+      });
+    });
+
+    const segundos = Math.round((performance.now() - inicioGeral) / 1000);
+    renderTabelas();
+    renderKPIs(usarModelo, segundos);
+    progresso(`Avaliação ${usarModelo ? 'completa' : 'rápida'} concluída em ${segundos} s.`);
+    document.getElementById('btn-exportar').disabled = false;
+  } catch (e) {
+    progresso('Erro na avaliação: ' + e.message);
+    if (typeof registrarEvento === 'function') registrarEvento({ etapa: 'erro', funcionalidade: 'avaliacao', status: 'falha', mensagem_erro: e.message });
+  } finally {
+    MODO_SOMENTE_RELATORIO = false;
+    executando = false;
+    document.getElementById('btn-rapida').disabled = false;
+    document.getElementById('btn-completa').disabled = false;
+  }
+}
+
+// ---------- Renderização ----------
+
+function renderKPIs(usarModelo, segundos) {
+  const chat = resultados.filter(r => r.grupo === 'chat');
+  const expl = resultados.filter(r => r.grupo === 'explicacao');
+  const gen = resultados.filter(r => r.grupo === 'generalizacao');
+  const respostas = [...chat, ...expl];
+  const doModelo = respostas.filter(r => r.origem === 'modelo').length;
+  const avaliados = [...chat, ...expl];
+  const aprovados = avaliados.filter(r => r.aprovado).length;
+  const latencias = respostas.map(r => r.latencia_ms).filter(v => typeof v === 'number');
+  const latMedia = latencias.length ? Math.round(latencias.reduce((a, b) => a + b, 0) / latencias.length) : null;
+
+  const kpis = [
+    { valor: pct(aprovados, avaliados.length), label: `Respostas aprovadas (${aprovados}/${avaliados.length})` },
+    { valor: `${chat.filter(r => r.marcador_correto).length}/${chat.length}`, label: 'Marcador identificado corretamente' },
+    { valor: `${gen.filter(r => r.aprovado).length}/${gen.length}`, label: 'Generalização (perguntas novas)' },
+    { valor: pct(respostas.filter(r => r.sem_termos_proibidos).length, respostas.length), label: 'Sem termos proibidos' },
+    { valor: pct(chat.filter(r => r.consistente).length, chat.length), label: 'Consistência (mesma pergunta 2x)' },
+    { valor: usarModelo ? pct(doModelo, respostas.length) : 'n/a', label: 'Saídas do modelo aceitas' },
+    { valor: latMedia === null ? '—' : latMedia + ' ms', label: 'Tempo médio por resposta' }
+  ];
+
+  document.getElementById('kpis').innerHTML = kpis.map(k =>
+    `<div class="kpi"><div class="kpi-valor">${esc(k.valor)}</div><div class="kpi-label">${esc(k.label)}</div></div>`
+  ).join('');
+
+  document.getElementById('resumo-execucao').textContent =
+    `Avaliação ${usarModelo ? 'completa (modelo de IA + camada do relatório)' : 'rápida (somente camada do relatório)'} · ` +
+    `executada em ${new Date().toLocaleString('pt-BR')} · duração ${segundos} s.`;
+}
+
+function linhaResposta(r) {
+  const saida = r.saida_modelo ? `<br><span class="fonte-resposta">Saída bruta do modelo: "${esc(r.saida_modelo.slice(0, 160))}"</span>` : '';
+  return `${esc(r.resposta.slice(0, 220))}${r.resposta.length > 220 ? '…' : ''}${saida}`;
+}
+
+function renderTabelas() {
+  const chat = resultados.filter(r => r.grupo === 'chat');
+  const expl = resultados.filter(r => r.grupo === 'explicacao');
+  const gen = resultados.filter(r => r.grupo === 'generalizacao');
+
+  if (chat.length) {
+    document.getElementById('tabela-chat').innerHTML = `<table class="tabela"><thead><tr>
+      <th>ID</th><th>Tipo</th><th>Pergunta</th><th>Esperado</th><th>Obtido</th><th>Origem</th><th>Motivo</th>
+      <th>Marcador</th><th>Português</th><th>Sem proibidos</th><th>Aderência</th><th>Consistente</th><th>Aprovado</th><th>Resposta</th>
+    </tr></thead><tbody>` + chat.map(r => `<tr>
+      <td class="mono">${esc(r.id)}</td><td>${esc(r.tipo)}</td><td>${esc(r.entrada)}</td>
+      <td class="mono">${esc(r.esperado || '—')}</td><td class="mono">${esc(r.obtido || '—')}</td>
+      <td>${esc(r.origem)}</td><td class="mono">${esc(r.motivo || '—')}</td>
+      <td>${marca(r.marcador_correto)}</td><td>${marca(r.portugues)}</td><td>${marca(r.sem_termos_proibidos)}</td>
+      <td>${marca(r.aderencia)}</td><td>${marca(r.consistente)}</td><td>${marca(r.aprovado)}</td>
+      <td>${linhaResposta(r)}</td>
+    </tr>`).join('') + `</tbody></table>`;
+  }
+
+  if (expl.length) {
+    document.getElementById('tabela-explicacoes').innerHTML = `<table class="tabela"><thead><tr>
+      <th>ID</th><th>Entrada</th><th>Origem</th><th>Motivo</th><th>Português</th><th>Sem proibidos</th><th>Aderência</th><th>Aprovado</th><th>Tempo</th><th>Resposta</th>
+    </tr></thead><tbody>` + expl.map(r => `<tr>
+      <td class="mono">${esc(r.id)}</td><td>${esc(r.entrada)}</td><td>${esc(r.origem)}</td><td class="mono">${esc(r.motivo || '—')}</td>
+      <td>${marca(r.portugues)}</td><td>${marca(r.sem_termos_proibidos)}</td><td>${marca(r.aderencia)}</td><td>${marca(r.aprovado)}</td>
+      <td class="mono">${r.latencia_ms === null ? '—' : esc(r.latencia_ms) + ' ms'}</td>
+      <td>${linhaResposta(r)}</td>
+    </tr>`).join('') + `</tbody></table>`;
+  }
+
+  if (gen.length) {
+    document.getElementById('tabela-generalizacao').innerHTML = `<table class="tabela"><thead><tr>
+      <th>ID</th><th>Pergunta</th><th>Esperado</th><th>Obtido</th><th>Correto</th><th>Observação</th>
+    </tr></thead><tbody>` + gen.map(r => `<tr>
+      <td class="mono">${esc(r.id)}</td><td>${esc(r.entrada)}</td><td class="mono">${esc(r.esperado || '—')}</td>
+      <td class="mono">${esc(r.obtido || '—')}</td><td>${marca(r.aprovado)}</td><td>${esc(r.observacao || '—')}</td>
+    </tr>`).join('') + `</tbody></table>`;
+  }
+}
+
+// ---------- Exportação ----------
+
+function exportarResultadosCSV() {
+  const colunas = ['grupo', 'id', 'tipo', 'entrada', 'esperado', 'obtido', 'origem', 'motivo',
+    'marcador_correto', 'portugues', 'sem_termos_proibidos', 'aderencia', 'consistente', 'aprovado',
+    'latencia_ms', 'resposta', 'saida_modelo', 'observacao'];
+  const escapar = (v) => {
+    if (v === null || v === undefined) return '';
+    const t = String(v).replace(/"/g, '""');
+    return /[",;\n]/.test(t) ? `"${t}"` : t;
+  };
+  const linhas = [colunas.join(',')];
+  resultados.forEach(r => linhas.push(colunas.map(c => escapar(r[c])).join(',')));
+
+  const blob = new Blob(['\uFEFF' + linhas.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `genera_avaliacao_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('btn-rapida').addEventListener('click', () => executarAvaliacao(false));
+document.getElementById('btn-completa').addEventListener('click', () => executarAvaliacao(true));
+document.getElementById('btn-exportar').addEventListener('click', exportarResultadosCSV);
+</script>
+</body>
+</html>

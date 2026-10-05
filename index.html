@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genera IA — Painel do Paciente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/sprint4.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="eyebrow">Genera IA · Enterprise Challenge Sprint 4 · FIAP × Dasa</div>
+  <h1>Seu perfil genético, explicado</h1>
+  <div class="paciente-info">
+    Paciente <span id="paciente-id">—</span> · <span id="paciente-data">—</span>
+  </div>
+  <nav class="nav-sprint4">
+    <a class="nav-link ativo" href="index.html">Painel do paciente</a>
+    <a class="nav-link" href="monitor.html">Monitoramento</a>
+    <a class="nav-link" href="avaliacao.html">Avaliação do modelo</a>
+  </nav>
+  <div class="disclaimer">
+    <strong>Aviso importante:</strong> as explicações abaixo são informativas e geradas com apoio de Inteligência Artificial a partir do seu relatório genético. Elas não substituem uma avaliação médica. Converse sempre com seu médico para interpretar esses resultados no contexto da sua saúde.
+  </div>
+</header>
+
+<div class="container">
+
+  <section id="secao-ancestralidade">
+    <h2>Ancestralidade</h2>
+    <p class="section-sub">Composição genética estimada por região continental.</p>
+    <div class="ancestry-card">
+      <div class="ancestry-viz">
+        <svg id="ancestry-donut" width="160" height="160" viewBox="0 0 160 160"></svg>
+      </div>
+      <div class="ancestry-bars" id="ancestry-bars"></div>
+    </div>
+  </section>
+
+  <section id="secao-marcadores">
+    <h2>Achados do relatório</h2>
+    <p class="section-sub">Clique em um card para ver a explicação simplificada. Cada explicação mostra se foi gerada pelo modelo de IA ou a partir dos dados do relatório.</p>
+    <div class="filtros" id="filtros"></div>
+    <div class="cards-grid" id="cards-grid"></div>
+  </section>
+
+  <section id="secao-resumo">
+    <h2>Resumo automático</h2>
+    <p class="section-sub">Gera um resumo curto de todos os achados do relatório.</p>
+    <button class="btn" id="btn-resumo">Gerar resumo</button>
+    <div id="resumo-saida" style="margin-top:16px;"></div>
+  </section>
+
+  <section id="secao-visao">
+    <h2>Leitura de gráficos (multimodal)</h2>
+    <p class="section-sub">Envie uma imagem de um gráfico do relatório (PNG ou JPG, até 5 MB) para receber uma explicação simplificada. A imagem é processada apenas no seu navegador e não é armazenada.</p>
+    <div class="img-upload-row">
+      <input type="file" id="visao-input" accept="image/png,image/jpeg">
+    </div>
+    <div id="visao-resultado" style="margin-top:16px;"></div>
+  </section>
+
+  <section id="secao-agente">
+    <h2>Converse com o assistente</h2>
+    <p class="section-sub">Tire dúvidas sobre o seu relatório. As respostas são baseadas apenas nos dados acima.</p>
+    <div class="agente-panel">
+      <div class="chat-historico" id="chat-historico"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ex: o que significa minha predisposição cardiovascular?">
+        <button class="btn" id="chat-enviar">Enviar</button>
+      </div>
+      <button class="btn btn-secundario" id="btn-limpar-chat" style="margin-top:10px; align-self:flex-start;">Limpar histórico</button>
+    </div>
+  </section>
+
+  <footer>
+    Genera IA — Enterprise Challenge Sprint 4 · FIAP × Dasa · Flavia Bocchino (RM564213)
+  </footer>
+
+</div>
+
+<!-- Modal de detalhe do marcador -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">&times;</button>
+    <h3 id="modal-titulo"></h3>
+    <div class="tech" id="modal-tech"></div>
+    <div id="modal-explicacao"></div>
+  </div>
+</div>
+
+<script src="assets/js/logger.js"></script>
+<script src="assets/js/agente.js"></script>
+<script src="assets/js/visao.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

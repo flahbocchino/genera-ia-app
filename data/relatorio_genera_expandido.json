@@ -1,0 +1,136 @@
+{
+  "paciente": {
+    "id_anonimizado": "PAC-2026-0001",
+    "data_relatorio": "2026-07-15",
+    "laboratorio": "Genera - Dasa"
+  },
+  "ancestralidade": {
+    "europeia": 45.2,
+    "africana": 32.8,
+    "indigena_americana": 15.5,
+    "asiatica": 4.1,
+    "outras": 2.4
+  },
+  "marcadores": [
+    {
+      "id": "M001",
+      "nome": "Predisposição a Diabetes Tipo 2",
+      "categoria": "predisposicao_doencas",
+      "nivel_risco": "medio",
+      "descricao_tecnica": "Variante identificada no gene TCF7L2, associada a risco aumentado de resistência à insulina.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M002",
+      "nome": "Predisposição a Obesidade",
+      "categoria": "predisposicao_doencas",
+      "nivel_risco": "baixo",
+      "descricao_tecnica": "Variante no gene FTO associada a leve aumento no índice de massa corporal médio.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M003",
+      "nome": "Predisposição a Doença Cardiovascular",
+      "categoria": "predisposicao_doencas",
+      "nivel_risco": "medio",
+      "descricao_tecnica": "Variante associada a alterações no metabolismo lipídico e risco cardiovascular moderado.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M004",
+      "nome": "Predisposição a Hipertensão",
+      "categoria": "predisposicao_doencas",
+      "nivel_risco": "baixo",
+      "descricao_tecnica": "Variante com associação leve a regulação da pressão arterial via sistema renina-angiotensina.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M005",
+      "nome": "Risco de Hipertensão (sensibilidade ao sódio)",
+      "categoria": "cardiovascular",
+      "nivel_risco": "medio",
+      "descricao_tecnica": "Variante relacionada à sensibilidade individual ao sódio dietético e regulação da pressão arterial.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M006",
+      "nome": "Metabolismo Lipídico (colesterol)",
+      "categoria": "cardiovascular",
+      "nivel_risco": "alto",
+      "descricao_tecnica": "Variante no gene APOE associada a alterações no metabolismo de LDL e HDL.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M007",
+      "nome": "Intolerância à Lactose",
+      "categoria": "metabolico",
+      "nivel_risco": "alto",
+      "descricao_tecnica": "Variante no gene MCM6 associada à baixa persistência de lactase na vida adulta.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M008",
+      "nome": "Metabolismo da Cafeína",
+      "categoria": "metabolico",
+      "nivel_risco": "baixo",
+      "descricao_tecnica": "Variante no gene CYP1A2 associada a metabolização mais lenta da cafeína.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M009",
+      "nome": "Resposta a Anticoagulantes",
+      "categoria": "farmacogenetica",
+      "nivel_risco": "medio",
+      "descricao_tecnica": "Variante no gene VKORC1 associada à sensibilidade a anticoagulantes derivados de varfarina.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M010",
+      "nome": "Metabolismo de Medicamentos (CYP2D6)",
+      "categoria": "farmacogenetica",
+      "nivel_risco": "baixo",
+      "descricao_tecnica": "Variante associada à velocidade de metabolização de diversas classes de medicamentos comuns.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M011",
+      "nome": "Necessidade de Vitamina D",
+      "categoria": "nutrigenetica",
+      "nivel_risco": "medio",
+      "descricao_tecnica": "Variante no gene GC associada a menor eficiência na conversão e transporte de vitamina D.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M012",
+      "nome": "Sensibilidade ao Glúten",
+      "categoria": "nutrigenetica",
+      "nivel_risco": "baixo",
+      "descricao_tecnica": "Marcadores HLA associados a predisposição geral, sem indicação diagnóstica de doença celíaca.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M013",
+      "nome": "Ancestralidade Genética Predominante",
+      "categoria": "tracos",
+      "nivel_risco": "informativo",
+      "descricao_tecnica": "Composição ancestral estimada com base em painel de marcadores autossômicos.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M014",
+      "nome": "Percepção de Sabor Amargo",
+      "categoria": "tracos",
+      "nivel_risco": "informativo",
+      "descricao_tecnica": "Variante no gene TAS2R38 associada à sensibilidade a compostos amargos.",
+      "explicacao_simplificada": null
+    },
+    {
+      "id": "M015",
+      "nome": "Desempenho Atlético (fibras musculares)",
+      "categoria": "tracos",
+      "nivel_risco": "informativo",
+      "descricao_tecnica": "Variante no gene ACTN3 associada à proporção de fibras musculares de contração rápida.",
+      "explicacao_simplificada": null
+    }
+  ]
+}
